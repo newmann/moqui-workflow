@@ -1,65 +1,75 @@
-plugins {
-    id 'java'
-    id 'groovy'
-}
+apply plugin:'java'
+apply plugin:'groovy'
 
 group 'org.moqui.workflow'
 version '1.0.0'
 description 'Moqui Workflow'
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
 
 def jarBaseName = 'moqui-workflow'
 def moquiDir = projectDir.parentFile.parentFile.parentFile
 def frameworkDir = file(moquiDir.absolutePath + '/framework')
-def libDir = projectDir.absolutePath + '/lib'
+// to run use "gradle dependencyUpdates"
+apply plugin: 'com.github.ben-manes.versions'
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies { classpath 'com.github.ben-manes:gradle-versions-plugin:0.42.0' }
+}
+dependencyUpdates.resolutionStrategy = { componentSelection { rules -> rules.all { ComponentSelection selection ->
+    boolean rejected = ['alpha', 'beta', 'rc', 'cr', 'm', 'pr'].any { qualifier -> selection.candidate.version ==~ /(?i).*[.\d-]${qualifier}[.\d-]*/ }
+    if (rejected) selection.reject('Release candidate')
+} } }
 
 repositories {
-    flatDir name: 'frameworkLib', dirs: frameworkDir.absolutePath + '/lib'
-    flatDir name: 'projectLib', dirs: projectDir.absolutePath + '/lib'
+    flatDir name: 'localLib', dirs: frameworkDir.absolutePath + '/lib'
     mavenCentral()
-}
 
-dependencies {
-    compile(
-            project(':framework'),
-            project(':runtime:component:moqui-elasticsearch'),
-            // Apache Commons
-            'org.apache.commons:commons-lang3:3.8',
-            // JSON
-            'org.json:json:20180813'
-    )
-    testCompile(
-            project(':framework').configurations.testCompile.allDependencies
-    )
 }
-
 // Log4j has annotation processors, disable to avoid warning
 tasks.withType(JavaCompile) { options.compilerArgs << "-proc:none" }
 tasks.withType(GroovyCompile) { options.compilerArgs << "-proc:none" }
 
+dependencies {
+    implementation project(':framework')
+    implementation ('org.apache.commons:commons-lang3:3.13.0')
+    implementation ('org.json:json:20230618')
+    implementation 'org.apache.lucene:lucene-queryparser:9.7.0'
+
+    testImplementation project(':framework').configurations.testImplementation.allDependencies
+//    compile(
+//            project(':framework'),
+//            project(':runtime:component:moqui-elasticsearch'),
+//            // Apache Commons
+//            'org.apache.commons:commons-lang3:3.8',
+//            // JSON
+//            'org.json:json:20180813'
+//    )
+//    testCompile(
+//            project(':framework').configurations.testCompile.allDependencies
+//    )
+}
+
+
 // by default the Java plugin runs test on build, change to not do that (only run test if explicit task)
+// no longer workds as of gradle 4.8 or possibly earlier, use clear() instead: check.dependsOn.remove(test)
 check.dependsOn.clear()
 
-task cleanLib(type: Delete) {
-    delete fileTree(dir: libDir, include: '*')
-}
+task cleanLib(type: Delete) { delete fileTree(dir: projectDir.absolutePath+'/lib', include: '*') }
 clean.dependsOn cleanLib
 
-task copyDependencies {
-    doLast {
-        copy {
-            from (configurations.runtime
-                    - project(':framework').configurations.runtime
-                    - project(':runtime:component:moqui-elasticsearch').configurations.runtime
-                    - project(':runtime:component:moqui-workflow').jar.archivePath
-            )
-            into file(libDir)
-        }
-    }
+jar {
+    destinationDirectory = file(projectDir.absolutePath + '/lib')
+    archiveBaseName = jarBaseName
 }
+task copyDependencies { doLast {
+    copy { from (configurations.runtimeClasspath - project(':framework').configurations.runtimeClasspath - project(':framework').jar.archivePath)
+        into file(projectDir.absolutePath + '/lib') }
+} }
 copyDependencies.dependsOn cleanLib
+jar.dependsOn copyDependencies
 
 test {
     dependsOn cleanTest
@@ -79,9 +89,3 @@ test {
 
     beforeTest { descriptor -> logger.lifecycle("Running test: ${descriptor}") }
 }
-
-jar {
-    destinationDir = file(libDir)
-    baseName = jarBaseName
-}
-jar.dependsOn copyDependencies

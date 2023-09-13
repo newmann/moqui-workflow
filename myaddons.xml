@@ -6,10 +6,10 @@
     </repository>
 
     <!-- Moqui runtime -->
-    <runtime name="moqui-runtime" group="moqui" version="2.1.1" branch="master" repository="github"/>
+<!--    <runtime name="moqui-runtime" group="moqui" version="2.1.1" branch="master" repository="github"/>-->
 
     <!-- Moqui components -->
-    <component name="moqui-elasticsearch" group="moqui" version="1.2.0" branch="master" repository="github"/>
+<!--    <component name="moqui-elasticsearch" group="moqui" version="1.2.0" branch="master" repository="github"/>-->
     <component name="moqui-workflow" group="netvariant" version="1.0.0" branch="master" repository="github"/>
 
 </addons>
